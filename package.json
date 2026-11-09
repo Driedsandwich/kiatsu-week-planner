@@ -1,0 +1,6 @@
+{
+  "name": "kiatsu-shuyotei",
+  "private": true,
+  "type": "commonjs",
+  "description": "気圧と周期の週予定（ハッカソン試作・依存なし）"
+}

@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>気圧と周期の週予定</title>
+<meta name="description" content="気圧の予報と周期の時期から、重い予定をずらす案を出す週予定。記録はこの端末のブラウザだけに置きます。">
+<style>
+:root{
+  --bg:#F6EEF0; --ink:#4B3A5A; --accent:#5B7C99;
+  --card:#FBF6F8; --line:#E6D8DE; --muted:#7D6C88;
+  --ev-light:#E4ECF2; --ev-normal:#EDE2EC; --ev-heavy:#DFCADF;
+  --ph-mens:#F3C4D2; --ph-foll:#E7DCEC; --ph-ovul:#D3E1EC; --ph-lute:#EDD2DE;
+  --chip:#6B5180;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",system-ui,sans-serif;line-height:1.6;font-size:15px}
+[hidden]{display:none !important}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 20px 40px}
+/* 見出しの帯 */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+h1{margin:0;font-size:22px;letter-spacing:.04em;line-height:1.3}
+.brand p{margin:0;font-size:13px;color:var(--muted)}
+.banner{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 10px 8px 18px;font-size:13px;max-width:460px}
+.banner[hidden]{display:none}
+.banner button{border:0;background:transparent;font-size:18px;line-height:1;padding:4px 8px;color:var(--muted)}
+/* 週の切り替え */
+.controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin:18px 0 12px}
+.weeknav{display:flex;align-items:center;gap:6px;max-width:100%}
+.weeknav h2{margin:0 6px;font-size:21px;letter-spacing:.03em;white-space:nowrap}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:18px;line-height:1}
+.btn{border:1px solid var(--ink);background:transparent;border-radius:999px;padding:6px 16px;font-size:14px}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.small{padding:3px 12px;font-size:13px}
+.controls label{display:flex;align-items:center;gap:8px;font-size:14px}
+select,input[type=text],input[type=date],input[type=number],input[type=time]{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;min-height:36px}
+.chip{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;background:var(--ev-light);color:var(--ink)}
+.chip.fake{background:#F3D9E0}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+/* 週の表 */
+.board{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:0;overflow:hidden;display:grid;grid-template-columns:96px 1fr}
+.gut{padding:10px 8px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;justify-content:center;gap:4px;line-height:1.4}
+.gut b{color:var(--ink);font-size:13px}
+.row-chart{border-bottom:1px solid var(--line)}
+.row-chart{min-height:128px}
+.cell{min-width:0}
+#chart{width:100%;height:128px}
+#chart svg{display:block;width:100%;height:128px}
+.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-column:2}
+.board>.gut:not(.row-chart):not(.row-band){border-top:0;padding-top:46px;justify-content:flex-start}
+.day{padding:10px 8px 12px;border-left:1px solid var(--line);min-width:0;display:flex;flex-direction:column;gap:8px;min-height:250px}
+.day:first-child{border-left:0}
+.day.high{background:linear-gradient(#F3E4EA,#FBF6F8 70%)}
+.day.past{opacity:.62}
+.dh{text-align:center}
+.dh .dow{font-size:20px;font-weight:700;line-height:1.2}
+.dh .date{font-size:13px;color:var(--muted)}
+.dh .today{display:inline-block;font-size:11px;background:var(--ink);color:#fff;border-radius:999px;padding:0 7px;margin-left:4px}
+.meter{display:inline-block;font-size:11px;border-radius:999px;padding:1px 9px;margin-top:3px;background:var(--ev-light)}
+.meter.mid{background:var(--ev-normal)}
+.meter.high{background:var(--chip);color:#fff}
+.dm{display:none;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.evs{display:flex;flex-direction:column;gap:8px}
+.ev{position:relative;border-radius:10px;padding:7px 9px 8px 9px;font-size:13px;background:var(--ev-normal);min-width:0}
+.ev.w-light{background:var(--ev-light)}
+.ev.w-heavy{background:var(--ev-heavy);border-left:3px solid var(--ink)}
+.ev-time{font-size:12px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;padding-right:18px}
+.ev-w{font-size:11px;opacity:.85}
+.ev-title{font-weight:600;overflow-wrap:anywhere}
+.ev .del{position:absolute;top:2px;right:2px;border:0;background:transparent;color:var(--muted);font-size:15px;width:24px;height:24px;line-height:1;border-radius:50%}
+.ev .del:hover{background:rgba(75,58,90,.12)}
+.shift{margin-top:6px;border:0;border-radius:999px;background:var(--chip);color:#fff;padding:3px 12px;font-size:12px;font-weight:600}
+.shift-panel{margin-top:6px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;line-height:1.55}
+.shift-panel p{margin:0 0 6px}
+.empty{font-size:12px;color:var(--muted);text-align:center;padding:6px 0}
+/* 周期の帯 */
+.row-band{border-top:1px solid var(--line)}
+.band{grid-column:2;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;padding:10px 0;align-items:stretch}
+.band .run{min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:12px;line-height:1.35;padding:4px 6px;overflow:hidden}
+.band .run small{font-size:11px;color:var(--muted)}
+.band .run:first-child{border-radius:12px 0 0 12px}
+.band .run:last-child{border-radius:0 12px 12px 0}
+.band .run:only-child{border-radius:12px}
+.k-menstrual{background:var(--ph-mens)}.k-follicular{background:var(--ph-foll)}.k-ovulation{background:var(--ph-ovul)}.k-luteal{background:var(--ph-lute)}
+.bandnote{grid-column:1/-1;font-size:12px;color:var(--muted);padding:0 14px 10px 14px}
+.cell.row-chart{grid-column:2}
+/* おすすめ・フォーム */
+.cards{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-top:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 18px}
+.card h3{margin:0 0 6px;font-size:16px}
+.card p{margin:4px 0}
+.reco{grid-column:1/-1;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.reco .txt{flex:1;min-width:240px}
+.reco .txt p{margin:3px 0}
+.form{display:grid;gap:8px}
+.form .line{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.form label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.form .actions{display:flex;gap:8px;flex-wrap:wrap}
+.privacy{font-size:12px;color:var(--muted)}
+footer{margin-top:22px;font-size:12px;color:var(--muted);display:grid;gap:4px}
+footer a{color:var(--accent)}
+.sr{position:absolute;left:-9999px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* スマホ・せまい画面: 縦に並べる */
+@media (max-width:860px){
+  .wrap{padding:14px 12px 32px}
+  .top{align-items:flex-start}
+  .banner{max-width:none;width:100%;border-radius:16px}
+  .controls{gap:8px 12px}
+  .weeknav h2{font-size:15px;margin:0 2px;flex:1;text-align:center}
+  .icon-btn{width:32px;height:32px}
+  .meter{white-space:nowrap}
+  .controls{width:100%}
+  .controls label{flex:none}
+  .board{grid-template-columns:1fr}
+  .gut{display:none}
+  .cell.row-chart,.days,.band{grid-column:1}
+  .days{grid-template-columns:1fr;order:3}
+  .row-band{order:2;border-top:0}
+  .row-chart{order:1}
+  .bandnote{order:2}
+  .band{padding:6px 10px 2px}
+  .row-band{border-bottom:1px solid var(--line)}
+  .day{border-left:0;border-top:1px solid var(--line);min-height:0;display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:start;padding:10px 12px}
+  .day:first-child{border-top:0}
+  .dh{text-align:left}
+  .dm{display:flex;grid-column:2;grid-row:1}
+  .evs{grid-column:1/-1}
+  .dh .dow{font-size:18px}
+  .cards{grid-template-columns:1fr}
+  .bandnote{padding:2px 12px 10px}
+  .band .run{font-size:11px;padding:3px 2px}
+  .band .run small{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="#4B3A5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 40V22"/><path d="M24 24c-8 0-12-6-12-13 8 0 12 5 12 13z"/><path d="M24 24c8 0 12-6 12-13-8 0-12 5-12 13z"/><path d="M24 34c-6 0-10-3-12-8 6-1 10 2 12 8z"/><path d="M24 34c6 0 10-3 12-8-6-1-10 2-12 8z"/></svg>
+      <div>
+        <h1>気圧と周期の週予定</h1>
+        <p>体調の波に合わせて、重い予定をずらす案を出します</p>
+      </div>
+    </div>
+    <div class="banner" id="banner" role="status"><span id="bannerText"></span><button type="button" id="bannerClose" aria-label="お知らせを閉じる">×</button></div>
+  </header>
+
+  <div class="controls">
+    <div class="weeknav">
+      <button type="button" class="icon-btn" id="prev" aria-label="前の週">‹</button>
+      <h2 id="weekLabel"></h2>
+      <button type="button" class="icon-btn" id="next" aria-label="次の週">›</button>
+    </div>
+    <button type="button" class="btn small" id="thisWeek">今週</button>
+    <label>場所
+      <select id="city" aria-label="気圧を見る場所"></select>
+    </label>
+    <div class="status"><span class="chip" id="srcChip"></span><button type="button" class="btn small" id="loadReal">実際の予報を読む</button></div>
+  </div>
+
+  <main class="board" aria-label="1 週間の表">
+    <div class="gut row-chart"><b>気圧予報</b><span>hPa・日平均</span><span id="gutSample" class="chip fake" hidden>作り物</span></div>
+    <div class="cell row-chart"><div id="chart" role="img" aria-label="1 週間の気圧の折れ線"></div></div>
+    <div class="gut"><b>週の予定</b><span>毎週同じ曜日</span></div>
+    <div class="days" id="days"></div>
+    <div class="gut row-band"><b>周期の時期</b><span id="gutCycle" class="chip fake" hidden>作り物</span></div>
+    <div class="band row-band" id="band" aria-label="周期の時期の帯"></div>
+    <div class="bandnote">目安であり、医療の判断ではありません。体調が悪いときは、医療者に相談してください。</div>
+  </main>
+
+  <section class="cards" aria-label="今週のおすすめと入力">
+    <div class="card reco" id="reco">
+      <div class="txt"><h3>今週のおすすめ</h3><div id="recoText"></div></div>
+      <button type="button" class="btn" id="goAdjust">予定を調整する ›</button>
+    </div>
+    <div class="card">
+      <h3>周期の記録</h3>
+      <form class="form" id="cycleForm">
+        <div class="line">
+          <label>前回の始まりの日<input type="date" id="cStart" required></label>
+          <label>いつもの周期の日数<input type="number" id="cLen" min="21" max="45" value="28" style="width:96px" required></label>
+        </div>
+        <div class="actions"><button type="submit" class="btn primary small">記録する</button><button type="button" class="btn small" id="cClear">記録を消す</button></div>
+        <p class="privacy" id="cycleNote"></p>
+        <p class="privacy">記録はこの端末のブラウザ（localStorage）だけに置きます。外へは送りません。</p>
+      </form>
+    </div>
+    <div class="card">
+      <h3>予定を足す</h3>
+      <form class="form" id="evForm">
+        <div class="line">
+          <label>題<input type="text" id="eTitle" maxlength="40" required placeholder="例 企画の打ち合わせ" style="min-width:170px"></label>
+          <label>曜日<select id="eDow"></select></label>
+          <label>時刻<input type="time" id="eTime" value="10:00"></label>
+          <label>重さ<select id="eWeight"><option value="light">軽い</option><option value="normal" selected>ふつう</option><option value="heavy">重い</option></select></label>
+        </div>
+        <div class="actions"><button type="submit" class="btn primary small">予定を足す</button><button type="button" class="btn small" id="clearSample">見本の予定（作り物）を消す</button></div>
+        <p class="privacy">予定は毎週同じ曜日に出ます。重い予定だけが、ずらす案の対象です。</p>
+      </form>
+    </div>
+  </section>
+
+  <footer>
+    <div>Weather data by <a href="https://open-meteo.com/" rel="noopener">Open-Meteo.com</a>（<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>）・気象庁のモデル（jma_seamless）</div>
+    <div>見本の予定・見本の周期・見本の気圧は作り物です。実在の人や天気の記録ではありません。</div>
+    <div>点は「前日からの気圧の下げ幅」と「周期の時期」から、予定を組み替える目安として付けています。医療の判断ではありません。</div>
+    <div>AI エージェントからも使えます（MCP の道具 plan_week・phase_of。説明は llms.txt）。</div>
+  </footer>
+</div>
+
+<script>
+/* ENGINE:BEGIN */
+/*
+ * 気圧と周期の週予定: 計算だけの部品（画面と MCP の両方が使う・依存なし）
+ * ブラウザでは globalThis.KiatsuEngine、Node では require/import で使える。
+ * 医療の判断ではありません。点は「予定をずらす案を出すための目安」で、効果をうたう物ではありません。
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.KiatsuEngine = factory();
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var DOW = ['月', '火', '水', '木', '金', '土', '日']; // 0 = 月曜
+  var DOW_EN = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  var WEIGHT_JA = { light: '軽い', normal: 'ふつう', heavy: '重い' };
+  var HIGH_THRESHOLD = 3; // この点以上を「しんどさの見込みが高い日」とする
+  var STRONG_DROP = 6;    // 24 時間で 6 hPa 以上の下げを「強め」とする
+
+  // ---- 日付の部品（UTC の日数で数える。端末のタイムゾーンに左右されない） ----
+  function dayNum(iso) {
+    if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
+    var p = iso.split('-').map(Number);
+    var n = Date.UTC(p[0], p[1] - 1, p[2]) / 86400000;
+    return isoOf(n) === iso ? n : NaN;
+  }
+  function isoOf(n) {
+    var d = new Date(n * 86400000);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+  function addDays(iso, k) {
+    var n = dayNum(iso);
+    if (isNaN(n)) throw new Error('日付は YYYY-MM-DD の形で入れてください: ' + iso);
+    return isoOf(n + k);
+  }
+  function dowIndex(iso) { return (((new Date(dayNum(iso) * 86400000).getUTCDay()) + 6) % 7); }
+  function mondayOf(iso) {
+    if (isNaN(dayNum(iso))) throw new Error('日付は YYYY-MM-DD の形で入れてください: ' + iso);
+    return addDays(iso, -dowIndex(iso));
+  }
+  function fmtNum(x) { return String(Math.round(x * 10) / 10); }
+
+  // ---- 周期 ----
+  function normalizeCycle(c) {
+    if (!c) return null;
+    var start = c.lastStart || c.last_start || c.start;
+    if (isNaN(dayNum(start))) return null;
+    var len = Math.round(Number(c.length || c.cycleLen || c.cycle_length || 28));
+    if (!isFinite(len)) len = 28;
+    len = Math.min(45, Math.max(21, len));
+    return { lastStart: start, length: len };
+  }
+
+  /**
+   * 日付の時期を返す。周期日数 L のとき（一般に言われる目安の区切り）:
+   *   月経 1〜5 日目／卵胞期 6〜(L-15) 日目／排卵のころ (L-14)〜(L-12) 日目／黄体期 それ以降
+   * 点（しんどさへの足し）: 月経 1〜2 日目 = 2・月経 3〜5 日目 = 1・黄体期の後半（最後の 7 日）= 2・ほか 0
+   */
+  function phaseOf(iso, cycle) {
+    var c = normalizeCycle(cycle);
+    var n = dayNum(iso);
+    if (!c || isNaN(n)) return null;
+    var L = c.length;
+    var day = ((n - dayNum(c.lastStart)) % L + L) % L + 1;
+    var ovStart = L - 14, ovEnd = L - 12;
+    var key, name;
+    if (day <= 5) { key = 'menstrual'; name = '月経'; }
+    else if (day < ovStart) { key = 'follicular'; name = '卵胞期'; }
+    else if (day <= ovEnd) { key = 'ovulation'; name = '排卵のころ'; }
+    else { key = 'luteal'; name = '黄体期'; }
+    var late = key === 'luteal' && day >= L - 6;
+    var points = 0, label = null;
+    if (key === 'menstrual' && day <= 2) { points = 2; label = '月経の 1〜2 日目です'; }
+    else if (key === 'menstrual') { points = 1; label = '月経の ' + day + ' 日目です'; }
+    else if (late) { points = 2; label = '黄体期の後半です'; }
+    return { key: key, name: name, day: day, length: L, late: late, points: points, label: label };
+  }
+
+  // ---- 気圧 ----
+  /** 1 時間ごとの値（times は "YYYY-MM-DDTHH:MM"）を日平均にする。18 時間未満の日は捨てる。 */
+  function dailyFromHourly(times, values) {
+    var sums = {}, order = [];
+    for (var i = 0; i < times.length; i++) {
+      var v = values[i];
+      if (v === null || v === undefined || !isFinite(v)) continue;
+      var d = String(times[i]).slice(0, 10);
+      if (!sums[d]) { sums[d] = { s: 0, n: 0 }; order.push(d); }
+      sums[d].s += v; sums[d].n += 1;
+    }
+    return order.filter(function (d) { return sums[d].n >= 18; })
+      .map(function (d) { return { date: d, hpa: Math.round(sums[d].s / sums[d].n * 10) / 10 }; });
+  }
+
+  /** 日ごとの「前日からの下げ幅」(hPa・下がるほど正)。前日の値が無い日は null（0 にはしない）。 */
+  function dropMap(daily) {
+    var by = {};
+    (daily || []).forEach(function (p) {
+      if (p && !isNaN(dayNum(p.date)) && isFinite(p.hpa) && p.hpa !== null) by[p.date] = Number(p.hpa);
+    });
+    return { by: by, drop: function (iso) {
+      if (by[iso] === undefined) return null;
+      var prev = addDays(iso, -1);
+      if (by[prev] === undefined) return null;
+      return Math.round((by[prev] - by[iso]) * 10) / 10;
+    } };
+  }
+
+  /** 気圧の点: 下げ幅 2 未満 = 0／2 以上 = 1／4 以上 = 2／6 以上（強め）= 3 */
+  function pressurePoints(drop) {
+    if (drop === null || drop === undefined || drop < 2) return 0;
+    if (drop < 4) return 1;
+    if (drop < STRONG_DROP) return 2;
+    return 3;
+  }
+
+  // ---- 予定 ----
+  function normalizeWeight(w) {
+    var s = String(w === undefined ? 'normal' : w).trim().toLowerCase();
+    if (s === 'light' || s === '軽い' || s === '軽') return 'light';
+    if (s === 'heavy' || s === '重い' || s === '重') return 'heavy';
+    if (s === 'normal' || s === 'ふつう' || s === '普通' || s === 'medium') return 'normal';
+    throw new Error('重さは 軽い／ふつう／重い（light／normal／heavy）のどれかです: ' + w);
+  }
+  function normalizeDow(d) {
+    if (typeof d === 'number' && d >= 0 && d <= 6 && Math.floor(d) === d) return d; // 0 = 月曜
+    var s = String(d).trim().toLowerCase();
+    var i = DOW.indexOf(s.charAt(0));
+    if (i >= 0 && (s.length === 1 || s === DOW[i] + '曜' || s === DOW[i] + '曜日')) return i;
+    i = DOW_EN.indexOf(s.slice(0, 3));
+    if (i >= 0) return i;
+    throw new Error('曜日は 月〜日（または mon〜sun・0〜6 で 0 が月曜）で入れてください: ' + d);
+  }
+
+  function dayReason(day, role) {
+    var pFrag, qFrag;
+    var drop = day.drop;
+    if (role === 'from') {
+      if (day.points.pressure >= 1) pFrag = '前日から ' + fmtNum(drop) + ' hPa 下がる予報';
+      if (day.phase && day.phase.points >= 1) qFrag = day.phase.label;
+      if (pFrag && qFrag) return DOW[day.dowIndex] + '曜は' + pFrag + 'で、' + qFrag + '。';
+      if (pFrag) return DOW[day.dowIndex] + '曜は' + pFrag + 'です。';
+      if (qFrag) return DOW[day.dowIndex] + '曜は' + qFrag.replace(/です$/, '') + 'です。';
+      return DOW[day.dowIndex] + '曜は点の合計が高めです。';
+    }
+    if (drop !== null && drop <= -1) pFrag = '前日から ' + fmtNum(-drop) + ' hPa 上がる予報';
+    else pFrag = '気圧の下げ幅は ' + fmtNum(Math.max(drop === null ? 0 : drop, 0)) + ' hPa 程度の予報';
+    if (day.phase) qFrag = day.phase.points >= 1 ? '周期は' + day.phase.label.replace(/です$/, '') + 'です' : '周期の面でも重めの時期ではありません';
+    return DOW[day.dowIndex] + '曜は' + pFrag + (qFrag ? 'で、' + qFrag : 'です') + '。';
+  }
+
+  /**
+   * 1 週間の計画。
+   * input: { weekStart: 'YYYY-MM-DD'（週のどの日でもよい・月曜に直す）,
+   *          events: [{id?, title, dow, time:'HH:MM', weight}],
+   *          cycle: {lastStart, length} | null,
+   *          pressure: [{date, hpa}]（日平均。前日の値があると下げ幅が出る）,
+   *          today?: 'YYYY-MM-DD'（あれば過ぎた日は行き先にしない・札も付けない） }
+   * 札の条件: 重さ「重い」の予定が、点 >= 3 の日にある。
+   * 行き先: 同じ週で、気圧の下げ幅が分かり、点が元の日より低く、3 未満の日。
+   *         （点 + その日の重い予定の数）が小さい順 → 同じ時刻の予定が無い日 → 元の日に近い日。
+   */
+  function planWeek(input) {
+    input = input || {};
+    var weekStart = mondayOf(input.weekStart);
+    var cycle = normalizeCycle(input.cycle);
+    var dm = dropMap(input.pressure);
+    var today = input.today && !isNaN(dayNum(input.today)) ? input.today : null;
+    var evs = (input.events || []).map(function (e, i) {
+      if (!e || !e.title) throw new Error('予定には題（title）が要ります（' + (i + 1) + ' 件目）');
+      var o = { id: e.id !== undefined ? String(e.id) : 'e' + (i + 1), title: String(e.title), time: e.time ? String(e.time) : '', weight: normalizeWeight(e.weight) };
+      if (e.date && !isNaN(dayNum(e.date))) { o.date = e.date; o.dowIndex = dowIndex(e.date); }
+      else o.dowIndex = normalizeDow(e.dow);
+      return o;
+    });
+
+    var days = [];
+    for (var i = 0; i < 7; i++) {
+      var date = addDays(weekStart, i);
+      var drop = dm.drop(date);
+      var ph = phaseOf(date, cycle);
+      var pp = pressurePoints(drop), hp = ph ? ph.points : 0, score = pp + hp;
+      days.push({
+        date: date, dowIndex: i, dow: DOW[i],
+        hpa: dm.by[date] === undefined ? null : dm.by[date],
+        drop: drop, scored: drop !== null, past: today !== null && date < today,
+        phase: ph ? { key: ph.key, name: ph.name, day: ph.day, late: ph.late, points: ph.points, label: ph.label } : null,
+        points: { pressure: pp, phase: hp }, score: score,
+        level: score >= HIGH_THRESHOLD ? '高め' : (score >= 1 ? 'ふつう' : '穏やか'),
+        strongDrop: drop !== null && drop >= STRONG_DROP,
+        events: []
+      });
+    }
+    evs.forEach(function (e) {
+      var idx = e.date ? Math.round(dayNum(e.date) - dayNum(weekStart)) : e.dowIndex;
+      if (idx < 0 || idx > 6) return; // この週の外の予定（date 指定）
+      e.suggested = false;
+      days[idx].events.push(e);
+    });
+    days.forEach(function (d) { d.events.sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; }); });
+
+    var heavyCount = days.map(function (d) { return d.events.filter(function (e) { return e.weight === 'heavy'; }).length; });
+    var suggestions = [];
+    days.forEach(function (src) {
+      src.events.forEach(function (e) {
+        if (e.weight !== 'heavy' || src.score < HIGH_THRESHOLD || src.past) return;
+        var cands = days.filter(function (d) {
+          return d.date !== src.date && d.scored && !d.past && d.score < src.score && d.score < HIGH_THRESHOLD;
+        });
+        cands.sort(function (a, b) {
+          var ca = a.events.some(function (x) { return x.time && x.time === e.time; }) ? 1 : 0;
+          var cb = b.events.some(function (x) { return x.time && x.time === e.time; }) ? 1 : 0;
+          return ((a.score + heavyCount[a.dowIndex]) - (b.score + heavyCount[b.dowIndex])) || (ca - cb) ||
+            (Math.abs(a.dowIndex - src.dowIndex) - Math.abs(b.dowIndex - src.dowIndex)) || (a.dowIndex - b.dowIndex);
+        });
+        var to = cands[0] || null;
+        var reason = dayReason(src, 'from');
+        if (to) { reason += dayReason(to, 'to'); heavyCount[to.dowIndex] += 1; }
+        else reason += '同じ週には、点の低い日が見つかりませんでした。';
+        e.suggested = true;
+        suggestions.push({
+          eventId: e.id, title: e.title, time: e.time,
+          from: { date: src.date, dow: src.dow, score: src.score },
+          to: to ? { date: to.date, dow: to.dow, score: to.score } : null,
+          reason: reason
+        });
+      });
+    });
+
+    var summary = suggestions.length === 0
+      ? ['今週は、しんどさの見込みが高い日にある重い予定はありません。']
+      : suggestions.map(function (s) {
+          return '「' + s.title + '」（' + s.from.dow + '曜' + (s.time ? ' ' + s.time : '') + '）は' +
+            (s.to ? s.to.dow + '曜にずらす案があります。' : 'ずらす先の候補がありません。') + s.reason;
+        });
+    return { weekStart: weekStart, cycle: cycle, days: days, suggestions: suggestions, tags: suggestions.length, summary: summary };
+  }
+
+  // ---- 見本（作り物）: 画面の見本表示とテストで使う。実在の気圧・人の記録ではありません ----
+  /** 週の月曜に対する見本の気圧（前日 + 7 日・作り物）。木曜に 8 hPa 下がる形。 */
+  function samplePressure(weekStart) {
+    var mon = mondayOf(weekStart);
+    var v = [1016, 1018, 1016, 1017, 1009, 1011, 1014, 1016]; // 前の日曜〜日曜
+    return v.map(function (h, i) { return { date: addDays(mon, i - 1), hpa: h }; });
+  }
+  /** 見本の周期（作り物）: 指定した月曜が 19 日目（木曜から黄体期の後半）になる開始日・28 日周期 */
+  function sampleCycle(monday) { return { lastStart: addDays(mondayOf(monday), -18), length: 28 }; }
+  var SAMPLE_EVENTS = [ // 作り物
+    { id: 's1', title: '企画ミーティング', dow: '月', time: '10:00', weight: 'normal' },
+    { id: 's2', title: '資料の整理', dow: '月', time: '16:00', weight: 'light' },
+    { id: 's3', title: '資料作成', dow: '火', time: '09:30', weight: 'normal' },
+    { id: 's4', title: 'チーム定例', dow: '火', time: '13:00', weight: 'normal' },
+    { id: 's5', title: 'デザイン確認', dow: '水', time: '10:00', weight: 'normal' },
+    { id: 's6', title: '買い物', dow: '水', time: '15:00', weight: 'light' },
+    { id: 's7', title: '社内レビュー', dow: '木', time: '09:00', weight: 'heavy' },
+    { id: 's8', title: '企画の発表準備', dow: '木', time: '14:00', weight: 'heavy' },
+    { id: 's9', title: '提案資料作成', dow: '金', time: '10:00', weight: 'heavy' },
+    { id: 's10', title: '取引先の訪問', dow: '金', time: '15:00', weight: 'normal' },
+    { id: 's11', title: 'ヨガ', dow: '土', time: '09:00', weight: 'light' },
+    { id: 's12', title: '友人とカフェ', dow: '土', time: '14:00', weight: 'light' },
+    { id: 's13', title: '家の片付け', dow: '日', time: '10:00', weight: 'normal' }
+  ];
+
+  return {
+    DOW: DOW, WEIGHT_JA: WEIGHT_JA, HIGH_THRESHOLD: HIGH_THRESHOLD, STRONG_DROP: STRONG_DROP,
+    dayNum: dayNum, isoOf: isoOf, addDays: addDays, dowIndex: dowIndex, mondayOf: mondayOf,
+    normalizeCycle: normalizeCycle, phaseOf: phaseOf,
+    dailyFromHourly: dailyFromHourly, dropMap: dropMap, pressurePoints: pressurePoints,
+    normalizeWeight: normalizeWeight, normalizeDow: normalizeDow,
+    planWeek: planWeek, samplePressure: samplePressure, sampleCycle: sampleCycle, SAMPLE_EVENTS: SAMPLE_EVENTS
+  };
+});
+/* ENGINE:END */
+</script>
+<script>
+(function () {
+  'use strict';
+  var E = window.KiatsuEngine;
+  var DOW = E.DOW, WJ = E.WEIGHT_JA;
+  var CITIES = [
+    { name: '東京', lat: 35.6895, lon: 139.6917 }, { name: '大阪', lat: 34.6937, lon: 135.5023 },
+    { name: '名古屋', lat: 35.1815, lon: 136.9066 }, { name: '福岡', lat: 33.5904, lon: 130.4017 },
+    { name: '札幌', lat: 43.0618, lon: 141.3545 }, { name: '広島', lat: 34.3853, lon: 132.4553 },
+    { name: '彦根', lat: 35.2746, lon: 136.2594 }, { name: '仙台', lat: 38.2682, lon: 140.8694 },
+    { name: '京都', lat: 35.0116, lon: 135.7681 }, { name: '那覇', lat: 26.2124, lon: 127.6809 }
+  ];
+  var KEY = { cycle: 'kiatsu.cycle.v1', events: 'kiatsu.events.v1', city: 'kiatsu.city.v1' };
+
+  function $(s) { return document.querySelector(s); }
+  function h(tag, attrs) {
+    var el = document.createElement(tag), k;
+    attrs = attrs || {};
+    for (k in attrs) {
+      var v = attrs[k];
+      if (v === false || v === null || v === undefined) continue;
+      if (k === 'class') el.className = v;
+      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), v);
+      else if (k === 'hidden') el.hidden = !!v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c === null || c === undefined || c === false) continue;
+      el.append(c.nodeType ? c : document.createTextNode(String(c)));
+    }
+    return el;
+  }
+
+  // 記録はこの端末のブラウザだけ。使えない時は、この画面を開いている間だけ覚える
+  var store = (function () {
+    var ok = true, mem = {};
+    try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); } catch (e) { ok = false; }
+    return {
+      get: function (k) { try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (e) { return null; } },
+      set: function (k, v) { if (ok) { try { localStorage.setItem(k, v); return; } catch (e) {} } mem[k] = v; },
+      del: function (k) { if (ok) { try { localStorage.removeItem(k); } catch (e) {} } delete mem[k]; }
+    };
+  })();
+  function readJSON(k) { try { var s = store.get(k); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+
+  function localToday() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  var params = new URLSearchParams(location.search);
+  var forceSample = params.get('sample') === '1';
+  var TODAY = localToday();
+  var THIS_MONDAY = E.mondayOf(TODAY);
+
+  var state = {
+    weekStart: THIS_MONDAY,
+    city: Math.max(0, Math.min(CITIES.length - 1, parseInt(store.get(KEY.city) || '5', 10) || 0)),
+    events: null, cycle: null,
+    mode: 'sample',   // 'sample' | 'real'
+    real: null, loading: false, failed: false, reqId: 0,
+    bannerClosed: false
+  };
+  (function loadSaved() {
+    var ev = readJSON(KEY.events);
+    state.events = Array.isArray(ev) ? ev.filter(function (e) { return e && e.title; }) : E.SAMPLE_EVENTS.map(function (e) { var o = {}; for (var k in e) o[k] = e[k]; o.sample = true; return o; });
+    var c = readJSON(KEY.cycle);
+    state.cycle = E.normalizeCycle(c);
+  })();
+  function saveEvents() { store.set(KEY.events, JSON.stringify(state.events)); }
+
+  // ---- 気圧の取得（鍵は要らない）。file:// では最初から見本で動き、ボタンで試せる ----
+  function apiUrl(c) {
+    return 'https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon +
+      '&hourly=surface_pressure&models=jma_seamless&timezone=Asia%2FTokyo&forecast_days=7&past_days=6';
+  }
+  function loadReal() {
+    var id = ++state.reqId, ctl = new AbortController(), t = setTimeout(function () { ctl.abort(); }, 10000);
+    state.loading = true; state.failed = false; renderStatus();
+    fetch(apiUrl(CITIES[state.city]), { signal: ctl.signal })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        if (id !== state.reqId) return;
+        var daily = E.dailyFromHourly(j.hourly.time, j.hourly.surface_pressure);
+        if (daily.length < 2) throw new Error('empty');
+        state.real = daily; state.mode = 'real';
+      })
+      .catch(function () { if (id !== state.reqId) return; state.mode = 'sample'; state.real = null; state.failed = true; })
+      .then(function () { clearTimeout(t); if (id === state.reqId) { state.loading = false; renderAll(); } });
+  }
+
+  function pressureForWeek() {
+    return state.mode === 'real' ? state.real : E.samplePressure(state.weekStart);
+  }
+  function effectiveCycle() {
+    return state.cycle || E.sampleCycle(THIS_MONDAY);
+  }
+
+  var plan = null;
+  function compute() {
+    plan = E.planWeek({
+      weekStart: state.weekStart, events: state.events, cycle: effectiveCycle(),
+      pressure: pressureForWeek(), today: state.mode === 'real' ? TODAY : null
+    });
+  }
+
+  // ---- 描画 ----
+  function mdLabel(iso) { var p = iso.split('-'); return Number(p[1]) + '月' + Number(p[2]) + '日'; }
+  function renderWeekLabel() {
+    var a = plan.days[0], b = plan.days[6];
+    $('#weekLabel').textContent = mdLabel(a.date) + '（月）〜 ' + mdLabel(b.date) + '（日）';
+  }
+  function renderStatus() {
+    var chip = $('#srcChip'), btn = $('#loadReal');
+    var city = CITIES[state.city].name;
+    chip.className = 'chip';
+    if (state.loading) chip.textContent = city + ' の予報を読んでいます…';
+    else if (state.mode === 'real') chip.textContent = 'Open-Meteo の予報（' + city + '）';
+    else { chip.classList.add('fake'); chip.textContent = state.failed ? '予報を読めなかったので、見本の気圧（作り物）で表示' : '見本の気圧（作り物）で表示'; }
+    btn.hidden = state.mode === 'real' || state.loading;
+    btn.textContent = state.failed ? 'もう一度読む' : '実際の予報を読む';
+    $('#gutSample').hidden = state.mode === 'real';
+    $('#gutCycle').hidden = !!state.cycle;
+  }
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function s(tag, attrs, text) {
+    var el = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+  function renderChart() {
+    var host = $('#chart');
+    host.textContent = '';
+    var W = host.clientWidth || 700, H = 128, padT = 34, padB = 22;
+    var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, 'aria-hidden': 'true' });
+    var colW = W / 7, i;
+    for (i = 1; i < 7; i++) svg.append(s('line', { x1: i * colW, x2: i * colW, y1: 0, y2: H, stroke: '#E6D8DE', 'stroke-width': 1 }));
+    var vals = plan.days.map(function (d) { return d.hpa; }).filter(function (v) { return v !== null; });
+    var summary = '気圧（hPa）: ' + plan.days.map(function (d) { return d.dow + ' ' + (d.hpa === null ? 'なし' : d.hpa); }).join('、');
+    host.setAttribute('aria-label', summary);
+    if (!vals.length) {
+      svg.append(s('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: '#7D6C88', 'font-size': 13 }, 'この週の予報はまだありません（予報は今日から 7 日先までです）'));
+      host.append(svg); return;
+    }
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi - lo < 12) { var mid = (hi + lo) / 2; lo = mid - 6; hi = mid + 6; }
+    var yOf = function (v) { return padT + (hi - v) / (hi - lo) * (H - padT - padB); };
+    var seg = [], cur = [];
+    plan.days.forEach(function (d, k) {
+      if (d.hpa === null) { if (cur.length) seg.push(cur); cur = []; }
+      else cur.push([(k + 0.5) * colW, yOf(d.hpa)]);
+    });
+    if (cur.length) seg.push(cur);
+    seg.forEach(function (pts) {
+      if (pts.length > 1) svg.append(s('polyline', { points: pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '), fill: 'none', stroke: '#5B7C99', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    });
+    plan.days.forEach(function (d, k) {
+      if (d.hpa === null) return;
+      var x = (k + 0.5) * colW, y = yOf(d.hpa), strong = d.strongDrop;
+      svg.append(s('circle', { cx: x, cy: y, r: strong ? 6 : 4.5, fill: strong ? '#4B3A5A' : '#5B7C99', stroke: '#fff', 'stroke-width': 1.5 }));
+      svg.append(s('text', { x: x, y: y - 11, 'text-anchor': 'middle', fill: '#4B3A5A', 'font-size': 12, 'font-weight': strong ? 700 : 400 }, String(Math.round(d.hpa))));
+      if (d.drop !== null && d.drop >= 2) svg.append(s('text', { x: x, y: Math.min(H - 5, y + 20), 'text-anchor': 'middle', fill: strong ? '#4B3A5A' : '#5B7C99', 'font-size': 11, 'font-weight': strong ? 700 : 400 }, '▼' + (Math.round(d.drop * 10) / 10) + (strong ? ' 強め' : '')));
+    });
+    host.append(svg);
+  }
+
+  function eventBox(e, sug) {
+    var box = h('div', { class: 'ev w-' + e.weight });
+    box.append(
+      h('div', { class: 'ev-time' }, e.time || '時刻なし', h('span', { class: 'ev-w' }, '・' + WJ[e.weight])),
+      h('div', { class: 'ev-title' }, e.title),
+      h('button', { type: 'button', class: 'del', 'aria-label': '「' + e.title + '」を消す', title: '消す', onclick: function () {
+        state.events = state.events.filter(function (x) { return String(x.id) !== String(e.id); }); saveEvents(); renderAll();
+      } }, '×')
+    );
+    if (sug) {
+      var panel = h('div', { class: 'shift-panel', hidden: true }, h('p', {}, sug.reason));
+      if (sug.to) {
+        panel.append(h('button', { type: 'button', class: 'btn small primary', onclick: function () {
+          state.events.forEach(function (x) { if (String(x.id) === String(e.id)) { x.dow = sug.to.dow; delete x.sample; } });
+          saveEvents(); renderAll();
+        } }, sug.to.dow + '曜に移す'));
+      }
+      var chip = h('button', { type: 'button', class: 'shift', 'aria-expanded': 'false', onclick: function () {
+        panel.hidden = !panel.hidden; chip.setAttribute('aria-expanded', String(!panel.hidden));
+      } }, '⇄ ずらす案');
+      box.append(chip, panel);
+    }
+    return box;
+  }
+  function renderDays() {
+    var host = $('#days');
+    host.textContent = '';
+    plan.days.forEach(function (d) {
+      var col = h('div', { class: 'day' + (d.score >= E.HIGH_THRESHOLD ? ' high' : '') + (d.past ? ' past' : '') });
+      var meterTxt = d.scored ? d.level + '（' + d.score + '点）' : '気圧なし';
+      var dh = h('div', { class: 'dh' },
+        h('div', { class: 'dow' }, d.dow),
+        h('div', { class: 'date' }, Number(d.date.slice(5, 7)) + '/' + Number(d.date.slice(8)), d.date === TODAY ? h('span', { class: 'today' }, '今日') : null),
+        h('span', { class: 'meter' + (d.score >= E.HIGH_THRESHOLD ? ' high' : d.score >= 1 ? ' mid' : '') }, meterTxt));
+      var dm = h('div', { class: 'dm' },
+        h('span', {}, d.hpa === null ? '気圧 なし' : '気圧 ' + Math.round(d.hpa) + ' hPa' + (d.drop !== null && d.drop >= 2 ? '（▼' + (Math.round(d.drop * 10) / 10) + '）' : '')),
+        d.phase ? h('span', {}, d.phase.name + ' ' + d.phase.day + ' 日目') : null);
+      var evs = h('div', { class: 'evs' });
+      d.events.forEach(function (e) {
+        var sug = plan.suggestions.filter(function (x) { return x.eventId === e.id; })[0];
+        evs.append(eventBox(e, sug));
+      });
+      if (!d.events.length) evs.append(h('div', { class: 'empty' }, '予定なし'));
+      col.append(dh, dm, evs);
+      host.append(col);
+    });
+  }
+  var SHORT = { menstrual: '月経', follicular: '卵胞期', ovulation: '排卵', luteal: '黄体期' };
+  function renderBand() {
+    var host = $('#band');
+    host.textContent = '';
+    var runs = [];
+    plan.days.forEach(function (d, i) {
+      var last = runs[runs.length - 1];
+      if (last && last.key === d.phase.key) { last.n++; last.to = d.phase.day; }
+      else runs.push({ key: d.phase.key, name: d.phase.name, from: d.phase.day, to: d.phase.day, n: 1, start: i });
+    });
+    runs.forEach(function (r) {
+      var el = h('div', { class: 'run k-' + r.key, style: 'grid-column:' + (r.start + 1) + ' / span ' + r.n, title: r.name + ' ' + r.from + '〜' + r.to + ' 日目' },
+        r.n === 1 ? SHORT[r.key] : r.name,
+        r.n > 1 ? h('small', {}, r.from === r.to ? r.from + ' 日目' : r.from + '〜' + r.to + ' 日目') : null);
+      host.append(el);
+    });
+  }
+  function renderReco() {
+    var box = $('#recoText');
+    box.textContent = '';
+    if (!plan.suggestions.length) box.append(h('p', {}, plan.summary[0]));
+    plan.suggestions.forEach(function (sg) {
+      box.append(h('p', {}, '「' + sg.title + '」（' + sg.from.dow + '曜 ' + sg.time + '）は、' + (sg.to ? sg.to.dow + '曜に' : '別の日に') + 'ずらす案があります。' + sg.reason));
+    });
+    $('#goAdjust').hidden = !plan.suggestions.length;
+    var ban = $('#banner');
+    ban.hidden = state.bannerClosed;
+    var days = plan.suggestions.map(function (x) { return x.from.dow; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    $('#bannerText').textContent = days.length
+      ? days.join('・') + '曜はしんどさの見込みが高めです。重い予定は別日にずらす案があります。'
+      : '今週は、ずらす案が出る重い予定はありません。';
+  }
+  function renderAll() {
+    compute(); renderWeekLabel(); renderStatus(); renderChart(); renderDays(); renderBand(); renderReco();
+    var c = state.cycle;
+    $('#cycleNote').textContent = c ? '記録中: 前回の始まりの日 ' + c.lastStart + '・周期 ' + c.length + ' 日' : '記録が無いので、見本の周期（作り物）で表示しています。';
+  }
+
+  // ---- 入力 ----
+  function shiftWeek(n) { state.weekStart = E.addDays(state.weekStart, 7 * n); state.bannerClosed = false; renderAll(); }
+  $('#prev').addEventListener('click', function () { shiftWeek(-1); });
+  $('#next').addEventListener('click', function () { shiftWeek(1); });
+  $('#thisWeek').addEventListener('click', function () { state.weekStart = THIS_MONDAY; state.bannerClosed = false; renderAll(); });
+  $('#bannerClose').addEventListener('click', function () { state.bannerClosed = true; $('#banner').hidden = true; });
+  $('#loadReal').addEventListener('click', loadReal);
+  $('#goAdjust').addEventListener('click', function () {
+    var b = document.querySelector('.shift');
+    if (b) { b.scrollIntoView({ block: 'center', behavior: 'smooth' }); b.focus(); b.click(); }
+  });
+  var citySel = $('#city');
+  CITIES.forEach(function (c, i) { citySel.append(h('option', { value: String(i) }, c.name)); });
+  citySel.value = String(state.city);
+  citySel.addEventListener('change', function () {
+    state.city = parseInt(citySel.value, 10); store.set(KEY.city, String(state.city));
+    if (state.mode === 'real' || (!forceSample && location.protocol !== 'file:')) loadReal(); else renderAll();
+  });
+  var dowSel = $('#eDow');
+  DOW.forEach(function (d, i) { dowSel.append(h('option', { value: d }, d + '曜')); });
+  $('#cycleForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var c = E.normalizeCycle({ lastStart: $('#cStart').value, length: $('#cLen').value });
+    if (!c) return;
+    state.cycle = c; store.set(KEY.cycle, JSON.stringify(c)); renderAll();
+  });
+  $('#cClear').addEventListener('click', function () { state.cycle = null; store.del(KEY.cycle); $('#cStart').value = ''; renderAll(); });
+  $('#evForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var title = $('#eTitle').value.trim();
+    if (!title) return;
+    state.events.push({ id: 'u' + Date.now(), title: title, dow: $('#eDow').value, time: $('#eTime').value, weight: $('#eWeight').value });
+    saveEvents(); $('#eTitle').value = ''; renderAll();
+  });
+  $('#clearSample').addEventListener('click', function () {
+    state.events = state.events.filter(function (e) { return !e.sample; }); saveEvents(); renderAll();
+  });
+  if (state.cycle) { $('#cStart').value = state.cycle.lastStart; $('#cLen').value = state.cycle.length; }
+
+  var rz; window.addEventListener('resize', function () { cancelAnimationFrame(rz); rz = requestAnimationFrame(renderChart); });
+
+  renderAll();
+  if (!forceSample && location.protocol !== 'file:') loadReal();
+})();
+</script>
+</body>
+</html>
